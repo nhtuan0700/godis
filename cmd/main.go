@@ -5,6 +5,9 @@ import (
 	"io"
 	"log"
 	"net"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/nhtuan0700/godis/internal/threadpool"
@@ -47,18 +50,29 @@ func main() {
 	defer lister.Close()
 
 	fmt.Printf("Listening on host %s\n", host)
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 
 	// 1 pool with 2 threads
 	pool := threadpool.NewPool(2)
 	pool.Start()
-	for {
-		// conn == socket == dedicated communication channel
-		conn, err := lister.Accept()
-		if err != nil {
-			log.Fatalf("failed to accept: %v \n", err)
-			continue
+	go func() {
+		for {
+			conn, err := lister.Accept()
+			if err != nil {
+				if pool.IsClosed() {
+					log.Println("Pool is closed, shutting down")
+					return
+				}
+				log.Printf("failed to accept: %v \n", err)
+				continue
+			}
+			go pool.AddJob(conn)
 		}
+	}()
 
-		go pool.AddJob(conn)
-	}
+	<-sigChan
+	log.Println("Received shutdown signal, shutting down gracefully...")
+	pool.Close()
+	lister.Close()
 }
