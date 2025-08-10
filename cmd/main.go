@@ -6,6 +6,8 @@ import (
 	"log"
 	"net"
 	"time"
+
+	"github.com/nhtuan0700/godis/internal/threadpool"
 )
 
 func process(conn net.Conn) {
@@ -42,17 +44,21 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to listen on %s\n", host)
 	}
+	defer lister.Close()
 
 	fmt.Printf("Listening on host %s\n", host)
 
+	// 1 pool with 2 threads
+	pool := threadpool.NewPool(2)
+	pool.Start()
 	for {
 		// conn == socket == dedicated communication channel
 		conn, err := lister.Accept()
 		if err != nil {
-			log.Fatalf("failed to accept \n")
+			log.Fatalf("failed to accept: %v \n", err)
 			continue
 		}
 
-		go process(conn)
+		go pool.AddJob(conn)
 	}
 }
