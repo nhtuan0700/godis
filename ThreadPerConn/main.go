@@ -5,14 +5,13 @@ import (
 	"io"
 	"log"
 	"net"
-	"time"
 )
 
 func process(conn net.Conn) {
 	defer conn.Close()
 	log.Println("Handle conn from ", conn.RemoteAddr())
 	for {
-		conn.SetReadDeadline(time.Now().Add(time.Minute))
+		// conn.SetReadDeadline(time.Now().Add(time.Minute))
 		cmd, err := readCommand(conn)
 		if err != nil {
 			netErr, ok := err.(net.Error)
@@ -28,10 +27,10 @@ func process(conn net.Conn) {
 		}
 
 		// process
-		time.Sleep(time.Second)
+		// time.Sleep(time.Second)
 		// Reply
 		// simple http response
-		cmd = fmt.Sprintf("HTTP/1.1 200 OK \r\n\r\nWelcome to Godis! command: %s \r\n", string(cmd))
+		log.Println("Command: ", cmd)
 		if err := respond(cmd, conn); err != nil {
 			log.Println("err write: ", err)
 		}
