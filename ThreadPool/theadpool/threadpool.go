@@ -1,12 +1,10 @@
 package threadpool
 
 import (
-	"fmt"
 	"io"
 	"log"
 	"net"
 	"sync"
-	"time"
 )
 
 // elemenet in the queue
@@ -121,12 +119,12 @@ func (p *Pool) AddJob(conn net.Conn) {
 }
 
 func handleConnection(conn net.Conn) {
+	log.Println("Handle conn from ", conn.RemoteAddr())
 	defer conn.Close()
 	// Read data from client
 	for {
 		// conn.SetReadDeadline(time.Now().Add(time.Minute))
-		buf := make([]byte, 1000)
-		_, err := conn.Read(buf)
+		cmd, err := readCommand(conn)
 		if err != nil {
 			netErr, ok := err.(net.Error)
 			switch {
@@ -141,8 +139,27 @@ func handleConnection(conn net.Conn) {
 		}
 
 		// process
-		time.Sleep(time.Second * 10)
-		log.Printf("Request from %s\n", conn.RemoteAddr())
-		conn.Write([]byte(fmt.Sprintf("HTTP/1.1 200 OK \r\n\r\nWelcome to Godis! command: %s \r\n", string(buf))))
+		// time.Sleep(time.Second * 10)
+		if err := respond(cmd, conn); err != nil {
+			log.Println("err write: ", err)
+		}
 	}
+}
+
+func readCommand(conn net.Conn) (string, error) {
+	buf := make([]byte, 512)
+	n, err := conn.Read(buf)
+	if err != nil {
+		return "", err
+	}
+
+	return string(buf[:n]), nil
+}
+
+func respond(cmd string, conn net.Conn) error {
+	if _, err := conn.Write([]byte(cmd)); err != nil {
+		return err
+	}
+
+	return nil
 }
