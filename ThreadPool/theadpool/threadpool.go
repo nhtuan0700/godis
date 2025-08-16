@@ -1,6 +1,7 @@
 package threadpool
 
 import (
+	"fmt"
 	"io"
 	"log"
 	"net"
@@ -122,9 +123,9 @@ func (p *Pool) AddJob(conn net.Conn) {
 func handleConnection(conn net.Conn) {
 	defer conn.Close()
 	// Read data from client
-	buf := make([]byte, 1000)
 	for {
-		conn.SetReadDeadline(time.Now().Add(10 * time.Second))
+		// conn.SetReadDeadline(time.Now().Add(time.Minute))
+		buf := make([]byte, 1000)
 		_, err := conn.Read(buf)
 		if err != nil {
 			netErr, ok := err.(net.Error)
@@ -142,6 +143,6 @@ func handleConnection(conn net.Conn) {
 		// process
 		time.Sleep(time.Second * 10)
 		log.Printf("Request from %s\n", conn.RemoteAddr())
-		conn.Write([]byte("HTTP/1.1 200 OK \r\n\r\nWelcome to Godis!\r\n"))
+		conn.Write([]byte(fmt.Sprintf("HTTP/1.1 200 OK \r\n\r\nWelcome to Godis! command: %s \r\n", string(buf))))
 	}
 }
