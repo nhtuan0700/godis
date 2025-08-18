@@ -1,10 +1,14 @@
 package core
 
-import "errors"
+import (
+	"bytes"
+	"errors"
+	"fmt"
+)
 
 const CRLF = "\r\n"
 
-var RespNil = "$-1\r\n"
+var RespNil = []byte("$-1\r\n")
 
 // +OK\r\n => OK, 5, nil
 // return params:
@@ -22,20 +26,61 @@ func readSimpleString(data []byte) (string, int, error) {
 	return string(data[1:pos]), pos + 2, nil
 }
 
+// :-100\r\n => -100, 7, nil
 func readInt64(data []byte) (int64, int, error) {
-	return 0, 0, errors.New("to be implemented")
+	pos := 1
+	var signed int64 = 1
+	if data[pos] == '-' {
+		signed = -1
+		pos++
+	}
+	if data[pos] == '+' {
+		pos++
+	}
+
+	var value int64
+	for pos < len(data) && data[pos] != '\r' {
+		value = value*10 + int64(data[pos]-'0')
+		pos++
+	}
+
+	if pos == len(data) {
+		return 0, 0, errors.New("incorrect RESP standard format")
+	}
+	return signed * value, pos + 2, nil
 }
 
+// $5\r\nhello\r\n => 5, 4
+func readLen(data []byte) (int, int) {
+	res, pos, _ := readInt64(data)
+	return int(res), pos
+}
+
+// $5\r\nhello\r\n => hello, 11
 func readBulkString(data []byte) (string, int, error) {
-	return "", 0, errors.New("to be implemented")
+	length, pos := readLen(data)
+	return string(data[pos:(pos + length)]), pos + length + 2, nil
 }
 
+// *2\r\n$5\r\nhello\r\n$5\r\nworld\r\n => {"hello", "world"}
 func readArray(data []byte) (any, int, error) {
-	return nil, 0, errors.New("to be implemented")
+	length, pos := readLen(data)
+
+	res := make([]any, length)
+	for i := 0; i < length; i++ {
+		elm, delta, err := DecodeOne(data[pos:])
+		if err != nil {
+			return nil, 0, err
+		}
+		res[i] = elm
+		pos += delta
+	}
+
+	return res, pos, nil
 }
 
 func readError(data []byte) (string, int, error) {
-	return "", 0, errors.New("to be implemented")
+	return readSimpleString(data)
 }
 
 func DecodeOne(data []byte) (any, int, error) {
@@ -59,13 +104,56 @@ func DecodeOne(data []byte) (any, int, error) {
 	return nil, 0, nil
 }
 
-// convert from resp's data to raw data
+// RESP data => raw data
 func Decode(data []byte) (any, error) {
 	res, _, err := DecodeOne(data)
 	return res, err
 }
 
-// convert from raw data to resp's data
-func Encode(value any) []byte {
-	return nil
+func encodeString(s string) []byte {
+	return []byte(fmt.Sprintf("$%d%s%s%s", len(s), CRLF, s, CRLF))
+}
+
+func encodeStringArray(sa []string) []byte {
+	var b []byte
+	buf := bytes.NewBuffer(b)
+	for _, s := range sa {
+		buf.Write(encodeString(s))
+	}
+
+	return []byte(fmt.Sprintf("*%d%s%s", len(sa), CRLF, buf.Bytes()))
+}
+
+// raw data => RESP data
+func Encode(value any, isSimpleString bool) []byte {
+	switch v := value.(type) {
+	case string:
+		if isSimpleString {
+			return []byte(fmt.Sprintf("+%s%s", v, CRLF))
+		}
+		return []byte(fmt.Sprintf("$%d%s%s%s", len(v), CRLF, v, CRLF))
+	case int, int8, int16, int32, int64:
+		return []byte(fmt.Sprintf(":%d%s", v, CRLF))
+	case error:
+		return []byte(fmt.Sprintf("-%s%s", v.Error(), CRLF))
+	case []string:
+		return encodeStringArray(v)
+	case [][]string:
+		var b []byte
+		buf := bytes.NewBuffer(b)
+		for _, x := range v {
+			buf.Write(encodeStringArray(x))
+		}
+		return []byte(fmt.Sprintf("*%d%s%s", len(v), CRLF, buf.Bytes()))
+	case []any:
+		var b []byte
+		buf := bytes.NewBuffer(b)
+		for _, x := range v {
+			buf.Write(Encode(x, false))
+		}
+		return []byte(fmt.Sprintf("*%d%s%s", len(v), CRLF, buf.Bytes()))
+
+	default:
+		return RespNil
+	}
 }
