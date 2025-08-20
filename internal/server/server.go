@@ -8,19 +8,21 @@ import (
 	"syscall"
 
 	"github.com/nhtuan0700/godis/internal/config"
+	"github.com/nhtuan0700/godis/internal/core"
 	"github.com/nhtuan0700/godis/internal/core/io_multiplexer"
 )
 
-func readCommand(fd int) (string, error) {
+func readCommand(fd int) (*core.Command, error) {
 	var buf = make([]byte, 512)
 	n, err := syscall.Read(fd, buf)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	if n == 0 {
-		return "", io.EOF
+		return nil, io.EOF
 	}
-	return string(buf[:n]), nil
+	// log.Println("command: ", string(buf[:n]))
+	return core.ParseCommand(buf)
 }
 
 func respond(cmd string, fd int) error {
@@ -98,7 +100,6 @@ func RunIOMultiplexingServer() error {
 				}
 			} else {
 				cmd, err := readCommand(events[i].Fd)
-				log.Println("command: ", cmd)
 				if err != nil {
 					if err == io.EOF || err == syscall.ECONNRESET {
 						log.Println("client disconnected")
@@ -109,7 +110,7 @@ func RunIOMultiplexingServer() error {
 					continue
 				}
 
-				if err := respond(cmd, events[i].Fd); err != nil {
+				if err := core.ExcuteAndResponse(cmd, events[i].Fd); err != nil {
 					log.Println("write err: ", err)
 				}
 			}
