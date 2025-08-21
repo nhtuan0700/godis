@@ -5,11 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+
+	"github.com/nhtuan0700/godis/internal/constant"
 )
-
-const CRLF = "\r\n"
-
-var RespNil = []byte("$-1\r\n")
 
 // +OK\r\n => OK, 5, nil
 // return params:
@@ -112,7 +110,7 @@ func Decode(data []byte) (any, error) {
 }
 
 func encodeString(s string) []byte {
-	return []byte(fmt.Sprintf("$%d%s%s%s", len(s), CRLF, s, CRLF))
+	return []byte(fmt.Sprintf("$%d%s%s%s", len(s), constant.CRLF, s, constant.CRLF))
 }
 
 func encodeStringArray(sa []string) []byte {
@@ -122,7 +120,7 @@ func encodeStringArray(sa []string) []byte {
 		buf.Write(encodeString(s))
 	}
 
-	return []byte(fmt.Sprintf("*%d%s%s", len(sa), CRLF, buf.Bytes()))
+	return []byte(fmt.Sprintf("*%d%s%s", len(sa), constant.CRLF, buf.Bytes()))
 }
 
 // raw data => RESP data
@@ -130,13 +128,13 @@ func Encode(value any, isSimpleString bool) []byte {
 	switch v := value.(type) {
 	case string:
 		if isSimpleString {
-			return []byte(fmt.Sprintf("+%s%s", v, CRLF))
+			return []byte(fmt.Sprintf("+%s%s", v, constant.CRLF))
 		}
-		return []byte(fmt.Sprintf("$%d%s%s%s", len(v), CRLF, v, CRLF))
+		return []byte(fmt.Sprintf("$%d%s%s%s", len(v), constant.CRLF, v, constant.CRLF))
 	case int, int8, int16, int32, int64:
-		return []byte(fmt.Sprintf(":%d%s", v, CRLF))
+		return []byte(fmt.Sprintf(":%d%s", v, constant.CRLF))
 	case error:
-		return []byte(fmt.Sprintf("-%s%s", v.Error(), CRLF))
+		return []byte(fmt.Sprintf("-%s%s", v.Error(), constant.CRLF))
 	case []string:
 		return encodeStringArray(v)
 	case [][]string:
@@ -145,17 +143,17 @@ func Encode(value any, isSimpleString bool) []byte {
 		for _, x := range v {
 			buf.Write(encodeStringArray(x))
 		}
-		return []byte(fmt.Sprintf("*%d%s%s", len(v), CRLF, buf.Bytes()))
+		return []byte(fmt.Sprintf("*%d%s%s", len(v), constant.CRLF, buf.Bytes()))
 	case []any:
 		var b []byte
 		buf := bytes.NewBuffer(b)
 		for _, x := range v {
 			buf.Write(Encode(x, false))
 		}
-		return []byte(fmt.Sprintf("*%d%s%s", len(v), CRLF, buf.Bytes()))
+		return []byte(fmt.Sprintf("*%d%s%s", len(v), constant.CRLF, buf.Bytes()))
 
 	default:
-		return RespNil
+		return constant.RespNil
 	}
 }
 
