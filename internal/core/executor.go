@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 	"syscall"
+	"time"
 
 	"github.com/nhtuan0700/godis/internal/constant"
 )
@@ -57,7 +58,54 @@ func cmdGet(args []string) []byte {
 	return Encode(obj.Value, false)
 }
 
-func ExcuteAndResponse(cmd *Command, connFd int) error {
+func cmdTTL(args []string) []byte {
+	if len(args) > 1 {
+		return Encode(errors.New("ERR wrong number of arguments for 'ttl' command"), false)
+	}
+
+	key := args[0]
+	obj := dictStore.Get(key)
+	if obj == nil {
+		return constant.RespKeyNotExist
+	}
+
+	exp, ok := dictStore.GetExpiry(key)
+	if !ok {
+		return constant.TTLKeyExistNoExpire
+	}
+	remains := int64(exp - uint64(time.Now().UnixMilli()))
+	if remains < 0 {
+		return constant.RespKeyNotExist
+	}
+
+	return Encode(remains/1000, false)
+}
+
+func cmdPTTL(args []string) []byte {
+	if len(args) > 1 {
+		return Encode(errors.New("ERR wrong number of arguments for 'pttl' command"), false)
+	}
+
+	key := args[0]
+	obj := dictStore.Get(key)
+	if obj == nil {
+		return constant.RespKeyNotExist
+	}
+
+	exp, ok := dictStore.GetExpiry(key)
+	if !ok {
+		return constant.TTLKeyExistNoExpire
+	}
+	remains := int64(exp - uint64(time.Now().UnixMilli()))
+	if remains < 0 {
+		return constant.RespKeyNotExist
+	}
+
+	return Encode(remains, false)
+}
+
+// ExecuteAndResponse given a command, executes it and response
+func ExecuteAndResponse(cmd *Command, connFd int) error {
 	var res []byte
 
 	switch cmd.Cmd {
@@ -67,6 +115,10 @@ func ExcuteAndResponse(cmd *Command, connFd int) error {
 		res = cmdSet(cmd.Args)
 	case constant.CMD_GET:
 		res = cmdGet(cmd.Args)
+	case constant.CMD_TTL:
+		res = cmdTTL(cmd.Args)
+	case constant.CMD_PTTL:
+		res = cmdPTTL(cmd.Args)
 	default:
 		res = []byte(fmt.Sprintf("-ERR unknown command %s, with args beginning with:\r\n", cmd.Cmd))
 	}

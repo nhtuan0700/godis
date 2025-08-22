@@ -110,7 +110,7 @@ func RunIOMultiplexingServer() error {
 					continue
 				}
 
-				if err := core.ExcuteAndResponse(cmd, events[i].Fd); err != nil {
+				if err := core.ExecuteAndResponse(cmd, events[i].Fd); err != nil {
 					log.Println("write err: ", err)
 				}
 			}

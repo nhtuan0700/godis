@@ -34,6 +34,11 @@ func (d *Dict) SetExpiry(k string, ttlMs uint64) {
 	d.expiredDictStore[k] = uint64(time.Now().UnixMilli()) + ttlMs
 }
 
+func (d *Dict) GetExpiry(k string) (uint64, bool) {
+	exp, ok := d.expiredDictStore[k]
+	return exp, ok
+}
+
 func (d *Dict) HasExpired(k string) bool {
 	if expired, ok := d.expiredDictStore[k]; ok {
 		return expired <= uint64(time.Now().UnixMilli())
