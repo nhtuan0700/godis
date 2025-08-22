@@ -18,6 +18,10 @@ func NewDict() *Dict {
 	}
 }
 
+func (d *Dict) GetExpiredDictStore() (map[string]uint64) {
+	return d.expiredDictStore
+}
+
 func (d *Dict) NewObj(k string, v any, ttlMs uint64) *Obj {
 	obj := &Obj{
 		Value: v,
@@ -49,6 +53,7 @@ func (d *Dict) HasExpired(k string) bool {
 
 func (d *Dict) Get(k string) *Obj {
 	if obj, ok := d.dictStore[k]; ok {
+		// delete epxired key in passive mode
 		if d.HasExpired(k) {
 			d.Del(k)
 			return nil

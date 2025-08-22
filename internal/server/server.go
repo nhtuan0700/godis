@@ -6,6 +6,7 @@ import (
 	"log"
 	"net"
 	"syscall"
+	"time"
 
 	"github.com/nhtuan0700/godis/internal/config"
 	"github.com/nhtuan0700/godis/internal/core"
@@ -71,9 +72,14 @@ func RunIOMultiplexingServer() error {
 		return err
 	}
 
+	var lastActiveExpireExecTime = time.Now()
 	// 3. Monitor all the FDs in the monitoring list
 	// events := make([]io_multiplexer.Event, config.MaxConnections)
 	for {
+		if time.Now().After(lastActiveExpireExecTime) {
+			core.ActiveDeleteExpiredKeys()
+			lastActiveExpireExecTime = time.Now()
+		}
 		// wait for file descriptor in the monitoring list to be ready for I/O
 		// it is a blocking call
 		events, err := ioMultiplexer.Wait()
