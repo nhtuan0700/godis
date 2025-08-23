@@ -104,6 +104,64 @@ func cmdPTTL(args []string) []byte {
 	return Encode(remains, false)
 }
 
+func cmdDel(args []string) []byte {
+	if len(args) == 0 {
+		return Encode(errors.New("ERR wrong number of arguments for 'del' command"), false)
+	}
+
+	delCount := 0
+	for _, key := range args {
+		obj := dictStore.Get(key)
+		if obj == nil {
+			continue
+		}
+		delCount++
+	}
+
+	return Encode(delCount, false)
+}
+
+func cmdExists(args []string) []byte {
+	if len(args) == 0 {
+		return Encode(errors.New("ERR wrong number of arguments for 'exists' command"), false)
+	}
+
+	existingCount := 0
+	for _, key := range args {
+		obj := dictStore.Get(key)
+		if obj == nil {
+			continue
+		}
+		existingCount++
+	}
+
+	return Encode(existingCount, false)
+}
+
+func cmdExpire(args []string) []byte {
+	if len(args) != 2 {
+		return Encode(errors.New("ERR wrong number of arguments for 'expire' command"), false)
+	}
+
+	key, value := args[0], args[1]
+	obj := dictStore.Get(key)
+	if obj == nil {
+		return Encode(0, false)
+	}
+
+	expiredSec, err := strconv.ParseInt(value, 10, 64)
+	if err != nil {
+		return Encode(errors.New("ERR value is not an integer or out of range"), false)
+	}
+	if expiredSec <= 0 {
+		dictStore.Del(key)
+	} else {
+		dictStore.SetExpiry(key, uint64(expiredSec*1000))
+	}
+
+	return Encode(1, false)
+}
+
 // ExecuteAndResponse given a command, executes it and response
 func ExecuteAndResponse(cmd *Command, connFd int) error {
 	var res []byte
@@ -119,6 +177,12 @@ func ExecuteAndResponse(cmd *Command, connFd int) error {
 		res = cmdTTL(cmd.Args)
 	case constant.CMD_PTTL:
 		res = cmdPTTL(cmd.Args)
+	case constant.CMD_DEL:
+		res = cmdDel(cmd.Args)
+	case constant.CMD_EXIST:
+		res = cmdExists(cmd.Args)
+	case constant.CMD_EXPIRE:
+		res = cmdExpire(cmd.Args)
 	default:
 		res = []byte(fmt.Sprintf("-ERR unknown command %s, with args beginning with:\r\n", cmd.Cmd))
 	}
