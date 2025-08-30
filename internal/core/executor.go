@@ -183,6 +183,14 @@ func ExecuteAndResponse(cmd *Command, connFd int) error {
 		res = cmdExists(cmd.Args)
 	case constant.CMD_EXPIRE:
 		res = cmdExpire(cmd.Args)
+	case constant.CMD_SADD:
+		res = cmdSADD(cmd.Args)
+	case constant.CMD_SREM:
+		res = cmdSREM(cmd.Args)
+	case constant.CMD_SISMEMBER:
+		res = cmdSISMEMBER(cmd.Args)
+	case constant.CMD_SMEMBERS:
+		res = cmdSMEMEBERS(cmd.Args)
 	default:
 		res = []byte(fmt.Sprintf("-ERR unknown command %s, with args beginning with:\r\n", cmd.Cmd))
 	}
