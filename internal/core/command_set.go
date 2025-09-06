@@ -7,6 +7,7 @@ import (
 )
 
 
+// SADD key member [member ...]
 func cmdSADD(args []string) []byte {
 	if len(args) <= 1 {
 		return Encode(errors.New("ERR wrong number of arguments for 'sadd' command"), false)
@@ -22,6 +23,7 @@ func cmdSADD(args []string) []byte {
 	return Encode(simpleSet.Add(args[1:]...), false)
 }
 
+// SREM key member [member ...]
 func cmdSREM(args []string) []byte {
 	if len(args) <= 1 {
 		return Encode(errors.New("ERR wrong number of arguments for 'srem' command"), false)
@@ -36,6 +38,7 @@ func cmdSREM(args []string) []byte {
 	return Encode(simpleSet.Remove(args[1:]...), false)
 }
 
+// SISMEMBER key member
 func cmdSISMEMBER(args []string) []byte {
 	if len(args) != 2 {
 		return Encode(errors.New("ERR wrong number of arguments for 'sismember' command"), false)
@@ -49,6 +52,7 @@ func cmdSISMEMBER(args []string) []byte {
 	return Encode(simpleSet.IsMember(member), false)
 }
 
+// SMEMBERS key
 func cmdSMEMEBERS(args []string) []byte {
 	if len(args) != 1 {
 		return Encode(errors.New("ERR wrong number of arguments for 'smembers' command"), false)

@@ -10,6 +10,7 @@ var (
 	ErrorWrongTypeKey       = []byte("-WRONGTYPE Operation against a key holding the wrong kind of value\r\n")
 	ActiveExpireSampleSized = 20
 	ActiveExpireThreshold   = 0.1
+	BPlusTreeDegree         = 4
 )
 
 const (

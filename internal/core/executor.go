@@ -10,6 +10,7 @@ import (
 	"github.com/nhtuan0700/godis/internal/constant"
 )
 
+// PING [message]
 func cmdPING(args []string) []byte {
 	switch {
 	case len(args) == 0:
@@ -21,6 +22,7 @@ func cmdPING(args []string) []byte {
 	}
 }
 
+// SET key value [EX seconds]
 func cmdSet(args []string) []byte {
 	if len(args) == 1 || len(args) == 3 || len(args) > 4 {
 		return Encode(errors.New("ERR wrong number of arguments for 'set' command"), false)
@@ -40,6 +42,7 @@ func cmdSet(args []string) []byte {
 	return constant.RespOk
 }
 
+// GET key
 func cmdGet(args []string) []byte {
 	if len(args) != 1 {
 		return Encode(errors.New("ERR wrong number of arguments for 'get' command"), false)
@@ -58,6 +61,7 @@ func cmdGet(args []string) []byte {
 	return Encode(obj.Value, false)
 }
 
+// TTL key
 func cmdTTL(args []string) []byte {
 	if len(args) > 1 {
 		return Encode(errors.New("ERR wrong number of arguments for 'ttl' command"), false)
@@ -81,6 +85,7 @@ func cmdTTL(args []string) []byte {
 	return Encode(remains/1000, false)
 }
 
+// PTTL key
 func cmdPTTL(args []string) []byte {
 	if len(args) > 1 {
 		return Encode(errors.New("ERR wrong number of arguments for 'pttl' command"), false)
@@ -104,6 +109,7 @@ func cmdPTTL(args []string) []byte {
 	return Encode(remains, false)
 }
 
+// DEL key [key ...]
 func cmdDel(args []string) []byte {
 	if len(args) == 0 {
 		return Encode(errors.New("ERR wrong number of arguments for 'del' command"), false)
@@ -121,6 +127,7 @@ func cmdDel(args []string) []byte {
 	return Encode(delCount, false)
 }
 
+// EXISTS key [key ...]
 func cmdExists(args []string) []byte {
 	if len(args) == 0 {
 		return Encode(errors.New("ERR wrong number of arguments for 'exists' command"), false)
@@ -138,6 +145,7 @@ func cmdExists(args []string) []byte {
 	return Encode(existingCount, false)
 }
 
+// EXPIRE key seconds
 func cmdExpire(args []string) []byte {
 	if len(args) != 2 {
 		return Encode(errors.New("ERR wrong number of arguments for 'expire' command"), false)
@@ -191,6 +199,12 @@ func ExecuteAndResponse(cmd *Command, connFd int) error {
 		res = cmdSISMEMBER(cmd.Args)
 	case constant.CMD_SMEMBERS:
 		res = cmdSMEMEBERS(cmd.Args)
+	case constant.CMD_ZADD:
+		res = cmdZADD(cmd.Args)
+	case constant.CMD_ZSCORE:
+		res = cmdZSCORE(cmd.Args)
+	case constant.CMD_ZRANK:
+		res = cmdZRANK(cmd.Args)
 	default:
 		res = []byte(fmt.Sprintf("-ERR unknown command %s, with args beginning with:\r\n", cmd.Cmd))
 	}
