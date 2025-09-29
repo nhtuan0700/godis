@@ -4,7 +4,7 @@ type SortedSet struct {
 	tree *BPlusTree
 }
 
-func CreateZSet(degree int) *SortedSet {
+func NewSortedSet(degree int) *SortedSet {
 	return &SortedSet{
 		tree: NewBPlusTree(degree),
 	}

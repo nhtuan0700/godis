@@ -7,26 +7,20 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var ss *data_structure.SortedSet
-
-func TestMain(m *testing.M) {
-	ss = data_structure.NewSortedSet(3)
-	ss.Add(10.0, "k1")
-	ss.Add(20.0, "k2")
-	ss.Add(30.0, "k3")
-	ss.Add(40.0, "k4")
-	ss.Add(50.0, "k5")
-	ss.Add(60.0, "k6")
-	ss.Add(80.0, "k8")
-	ss.Add(70.0, "k7")
-	m.Run()
-}
-
-func TestSortedSet(t *testing.T) {
+func TestSortedSetSkiplist(t *testing.T) {
+	zs := data_structure.NewZSet()
+	zs.Add(10.0, "k1")
+	zs.Add(20.0, "k2")
+	zs.Add(30.0, "k3")
+	zs.Add(40.0, "k4")
+	zs.Add(50.0, "k5")
+	zs.Add(60.0, "k6")
+	zs.Add(80.0, "k8")
+	zs.Add(70.0, "k7")
 	testCases := []struct {
 		member string
 		score  float64
-		rank   int
+		rank   uint64
 	}{
 		{
 			member: "k1",
@@ -72,9 +66,9 @@ func TestSortedSet(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run("RankAndScore", func(t *testing.T) {
-			score, _ := ss.GetScore(tc.member)
+			rank, _ := zs.GetRank(tc.member, false)
+			score, _ := zs.GetScore(tc.member)
 			assert.Equal(t, score, tc.score)
-			rank := ss.GetRank(tc.member)
 			assert.Equal(t, rank, tc.rank)
 		})
 	}

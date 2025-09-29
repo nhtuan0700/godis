@@ -16,4 +16,5 @@ const (
 	CMD_ZADD      = "ZADD"
 	CMD_ZSCORE    = "ZSCORE"
 	CMD_ZRANK     = "ZRANK"
+	CMD_ZREM      = "ZREM"
 )

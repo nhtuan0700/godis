@@ -25,7 +25,7 @@ func cmdZADD(args []string) []byte {
 	key := args[0]
 	zset, exist := zsetStore[key]
 	if !exist {
-		zset = data_structure.CreateZSet(constant.BPlusTreeDegree)
+		zset = data_structure.NewZSet()
 		zsetStore[key] = zset
 	}
 
@@ -37,7 +37,7 @@ func cmdZADD(args []string) []byte {
 			return Encode(errors.New("score must be floating point number"), false)
 		}
 		ret := zset.Add(scoreNum, member)
-		if ret == 1 {
+		if ret {
 			added++
 		}
 	}
@@ -77,9 +77,33 @@ func cmdZRANK(args []string) []byte {
 		return constant.RespNil
 	}
 
-	rank := zset.GetRank(member)
-	if rank == -1 {
+	rank, exist := zset.GetRank(member, false)
+	if !exist {
 		return constant.RespNil
 	}
+
 	return Encode(rank, false)
+}
+
+// ZREM key member [member ...]
+func cmdZREM(args []string) []byte {
+	if len(args) < 2 {
+		return Encode(errors.New("ERR wrong number of arguments for 'zrem' command"), false)
+	}
+
+	key := args[0]
+	zset, exist := zsetStore[key]
+	if !exist {
+		return constant.RespNil
+	}
+
+	removeCount := 0
+	for i := 1; i < len(args); i++ {
+		ok := zset.Remove(args[i])
+		if ok {
+			removeCount++
+		}
+	}
+
+	return Encode(removeCount, false)
 }

@@ -131,7 +131,7 @@ func Encode(value any, isSimpleString bool) []byte {
 			return []byte(fmt.Sprintf("+%s%s", v, constant.CRLF))
 		}
 		return []byte(fmt.Sprintf("$%d%s%s%s", len(v), constant.CRLF, v, constant.CRLF))
-	case int, int8, int16, int32, int64:
+	case int, int8, int16, int32, int64, uint, uint8, uint32, uint64:
 		return []byte(fmt.Sprintf(":%d%s", v, constant.CRLF))
 	case error:
 		return []byte(fmt.Sprintf("-%s%s", v.Error(), constant.CRLF))

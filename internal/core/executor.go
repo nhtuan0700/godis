@@ -205,6 +205,8 @@ func ExecuteAndResponse(cmd *Command, connFd int) error {
 		res = cmdZSCORE(cmd.Args)
 	case constant.CMD_ZRANK:
 		res = cmdZRANK(cmd.Args)
+	case constant.CMD_ZREM:
+		res = cmdZREM(cmd.Args)
 	default:
 		res = []byte(fmt.Sprintf("-ERR unknown command %s, with args beginning with:\r\n", cmd.Cmd))
 	}
