@@ -207,6 +207,14 @@ func ExecuteAndResponse(cmd *Command, connFd int) error {
 		res = cmdZRANK(cmd.Args)
 	case constant.CMD_ZREM:
 		res = cmdZREM(cmd.Args)
+	case constant.CMD_CMS_INITBYDIM:
+		res = cmdCMSINITBYDIM(cmd.Args)
+	case constant.CMD_CMS_INITBYPROB:
+		res = cmdCMSINITBYPROB(cmd.Args)
+	case constant.CMD_CMS_INCRBY:
+		res = cmdCMSINCRBY(cmd.Args)
+	case constant.CMD_CMS_QUERY:
+		res = cmdCMSQUERY(cmd.Args)
 	default:
 		res = []byte(fmt.Sprintf("-ERR unknown command %s, with args beginning with:\r\n", cmd.Cmd))
 	}
