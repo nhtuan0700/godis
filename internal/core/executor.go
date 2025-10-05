@@ -215,6 +215,16 @@ func ExecuteAndResponse(cmd *Command, connFd int) error {
 		res = cmdCMSINCRBY(cmd.Args)
 	case constant.CMD_CMS_QUERY:
 		res = cmdCMSQUERY(cmd.Args)
+	case constant.CMD_BF_RESERVE:
+		res = cmdBFRESERVE(cmd.Args)
+	case constant.CMD_BF_ADD:
+		res = cmdBFADD(cmd.Args)
+	case constant.CMD_BF_MADD:
+		res = cmdBFMADD(cmd.Args)
+	case constant.CMD_BF_EXISTS:
+		res = cmdBFEXISTS(cmd.Args)
+	case constant.CMD_BF_MEXISTS:
+		res = cmdBFMEXISTS(cmd.Args)
 	default:
 		res = []byte(fmt.Sprintf("-ERR unknown command %s, with args beginning with:\r\n", cmd.Cmd))
 	}
