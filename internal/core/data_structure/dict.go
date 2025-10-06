@@ -18,7 +18,7 @@ func NewDict() *Dict {
 	}
 }
 
-func (d *Dict) GetExpiredDictStore() (map[string]uint64) {
+func (d *Dict) GetExpiredDictStore() map[string]uint64 {
 	return d.expiredDictStore
 }
 
@@ -35,6 +35,10 @@ func (d *Dict) NewObj(k string, v any, ttlMs uint64) *Obj {
 }
 
 func (d *Dict) SetExpiry(k string, ttlMs uint64) {
+	_, ok := d.expiredDictStore[k]
+	if !ok {
+		HashKeySpaceStat.Expire++
+	}
 	d.expiredDictStore[k] = uint64(time.Now().UnixMilli()) + ttlMs
 }
 
@@ -65,13 +69,21 @@ func (d *Dict) Get(k string) *Obj {
 }
 
 func (d *Dict) Set(k string, obj *Obj) {
+	_, ok := d.dictStore[k]
+	if !ok {
+		HashKeySpaceStat.Key++
+	}
 	d.dictStore[k] = obj
 }
 
 func (d *Dict) Del(k string) bool {
+	if _, ok := d.expiredDictStore[k]; ok {
+		delete(d.expiredDictStore, k)
+		HashKeySpaceStat.Expire--
+	}
 	if _, ok := d.dictStore[k]; ok {
 		delete(d.dictStore, k)
-		delete(d.expiredDictStore, k)
+		HashKeySpaceStat.Key--
 		return true
 	}
 

@@ -17,6 +17,7 @@ const (
 	CMD_ZSCORE    = "ZSCORE"
 	CMD_ZRANK     = "ZRANK"
 	CMD_ZREM      = "ZREM"
+	CMD_INFO      = "INFO"
 	// Count-Min Sketch
 	CMD_CMS_INITBYDIM  = "CMS.INITBYDIM"
 	CMD_CMS_INITBYPROB = "CMS.INITBYPROB"

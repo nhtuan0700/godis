@@ -1,6 +1,7 @@
 package core
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"strconv"
@@ -8,6 +9,7 @@ import (
 	"time"
 
 	"github.com/nhtuan0700/godis/internal/constant"
+	"github.com/nhtuan0700/godis/internal/core/data_structure"
 )
 
 // PING [message]
@@ -170,6 +172,15 @@ func cmdExpire(args []string) []byte {
 	return Encode(1, false)
 }
 
+// INFO [section [section...]]
+func cmdINFO(args []string) []byte {
+	var info []byte
+	buf := bytes.NewBuffer(info)
+	buf.WriteString("# Keyspace\r\n")
+	buf.WriteString(fmt.Sprintf("db:key=%d,epxires=%d,avg_ttl=0\r\n", data_structure.HashKeySpaceStat.Key, data_structure.HashKeySpaceStat.Expire))
+	return Encode(buf.String(), false)
+}
+
 // ExecuteAndResponse given a command, executes it and response
 func ExecuteAndResponse(cmd *Command, connFd int) error {
 	var res []byte
@@ -225,6 +236,8 @@ func ExecuteAndResponse(cmd *Command, connFd int) error {
 		res = cmdBFEXISTS(cmd.Args)
 	case constant.CMD_BF_MEXISTS:
 		res = cmdBFMEXISTS(cmd.Args)
+	case constant.CMD_INFO:
+		res = cmdINFO(cmd.Args)
 	default:
 		res = []byte(fmt.Sprintf("-ERR unknown command %s, with args beginning with:\r\n", cmd.Cmd))
 	}
