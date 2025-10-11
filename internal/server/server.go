@@ -5,13 +5,18 @@ import (
 	"io"
 	"log"
 	"net"
+	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
 	"github.com/nhtuan0700/godis/internal/config"
+	"github.com/nhtuan0700/godis/internal/constant"
 	"github.com/nhtuan0700/godis/internal/core"
 	"github.com/nhtuan0700/godis/internal/core/io_multiplexer"
 )
+
+var serverStatus int32 = constant.ServerStatusIdle
 
 func readCommand(fd int) (*core.Command, error) {
 	var buf = make([]byte, 512)
@@ -35,7 +40,8 @@ func respond(cmd string, fd int) error {
 	return nil
 }
 
-func RunIOMultiplexingServer() error {
+func RunIOMultiplexingServer(wg *sync.WaitGroup) error {
+	defer wg.Done()
 	// 1. Create listener FD
 	listener, err := net.Listen(config.Protocol, config.Address)
 	if err != nil {
@@ -75,18 +81,34 @@ func RunIOMultiplexingServer() error {
 	var lastActiveExpireExecTime = time.Now()
 	// 3. Monitor all the FDs in the monitoring list
 	// events := make([]io_multiplexer.Event, config.MaxConnections)
-	for {
+	for atomic.LoadInt32(&serverStatus) != constant.ServerStatusShuttingDown {
+		// Check last execution time and call it if it is more than 100ms ago
 		if time.Now().After(lastActiveExpireExecTime) {
-			core.ActiveDeleteExpiredKeys()
+			// Idle
+			if !atomic.CompareAndSwapInt32(&serverStatus, constant.ServerStatusIdle, constant.ServerStatusBusy) {
+				if serverStatus == constant.ServerStatusShuttingDown {
+					return nil
+				}
+			}
+			core.ActiveDeleteExpiredKeys() // Busy
+			atomic.SwapInt32(&serverStatus, constant.ServerStatusIdle)
 			lastActiveExpireExecTime = time.Now()
 		}
 		// wait for file descriptor in the monitoring list to be ready for I/O
 		// it is a blocking call
+		// Idle
 		events, err := ioMultiplexer.Wait()
 		if err != nil {
 			continue
 		}
-
+		// Goroutine #2 is gracefully shutdown
+		// means: serverStatus == ServerStatusShuttingDown
+		if !atomic.CompareAndSwapInt32(&serverStatus, constant.ServerStatusIdle, constant.ServerStatusBusy) {
+			if serverStatus == constant.ServerStatusShuttingDown {
+				return nil
+			}
+		}
+		// Busy
 		for i := 0; i < len(events); i++ {
 			if events[i].Fd == listenerFD {
 				log.Println("new client is trying to connect")
@@ -121,5 +143,9 @@ func RunIOMultiplexingServer() error {
 				}
 			}
 		}
+		// Idle
+		atomic.SwapInt32(&serverStatus, constant.ServerStatusIdle)
 	}
+
+	return nil
 }
