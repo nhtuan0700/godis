@@ -12,3 +12,5 @@ const EvictPolicy = "allkeys-lru"
 
 const EpoolMaxSize = 16
 const LruSampledSize = 5
+
+const ListenerNumber = 2

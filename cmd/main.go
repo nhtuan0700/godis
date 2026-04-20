@@ -2,6 +2,8 @@ package main
 
 import (
 	"log"
+	"net/http"
+	_ "net/http/pprof" // for profiling
 	"os"
 	"os/signal"
 	"sync"
@@ -17,12 +19,32 @@ func main() {
 	wg.Add(2)
 
 	go func() {
-		err := server.RunIOMultiplexingServer(&wg)
+		// Single threaded listener server
+		// err := server.RunIOMultiplexingServer(&wg)
+		// if err != nil {
+		// 	log.Fatal(err)
+		// }
+
+		// Multi-threaded listener server
+		s, err := server.NewServer()
+		if err != nil {
+			log.Fatal(err)
+		}
+		// err = s.StartSingleListener(&wg)
+		// if err != nil {
+		// 	log.Fatal(err)
+		// }
+		err = s.StartMultiListeners(&wg)
 		if err != nil {
 			log.Fatal(err)
 		}
 	}()
 
 	go server.WaitForSignal(&wg, signals)
+
+	// Expose the /debug/pprof endpoints on a separate goroutine
+	go func() {
+		log.Println(http.ListenAndServe("localhost:6060", nil))
+	}()
 	wg.Wait()
 }
