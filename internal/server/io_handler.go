@@ -17,6 +17,11 @@ type IOHandler struct {
 	ioMultiplexer io_multiplexer.IOMultiplexer
 	server        *Server
 	mu            sync.Mutex
+	// Garbage Collector may close the connection if we don't keep a reference to it in the I/O handler
+	// We use a map to store active connections, the key is the file descriptor of the connection
+	// when running benchmark, the number of connections can be very large, the gc run quickly and close the connection before the I/O handler can read from it
+	// which causes "bad file descriptor" error -> benchmark fails
+	conns map[int]net.Conn
 }
 
 func NewIOHandler(id int, server *Server) (*IOHandler, error) {
@@ -29,6 +34,7 @@ func NewIOHandler(id int, server *Server) (*IOHandler, error) {
 		id:            id,
 		ioMultiplexer: ioMultiplexer,
 		server:        server,
+		conns:         make(map[int]net.Conn),
 	}
 
 	return ioHandler, nil
@@ -51,7 +57,7 @@ func (h *IOHandler) AddConn(conn net.Conn) error {
 	err = rawConn.Control(func(fd uintptr) {
 		connFd := int(fd)
 		log.Printf("I/O Handler %d is monitoring fd %d", h.id, connFd)
-
+		h.conns[connFd] = conn
 		h.ioMultiplexer.Monitor(io_multiplexer.Event{
 			Fd: connFd,
 			Op: io_multiplexer.OpRead,
@@ -61,7 +67,7 @@ func (h *IOHandler) AddConn(conn net.Conn) error {
 	return err
 }
 
-// Run starts the event loop for the I/O handler 
+// Run starts the event loop for the I/O handler
 // waiting for events on monitored file descriptors and processing them
 func (h *IOHandler) Run() {
 	log.Printf("I/O Handler %d started\n", h.id)
@@ -81,7 +87,7 @@ func (h *IOHandler) Run() {
 			cmd, err := readCommand(connFd)
 			if err != nil {
 				if err == io.EOF || err == syscall.ECONNRESET {
-					// log.Printf("I/O Handler %d: connection closed on fd %d\n", h.id, connFd)
+					log.Printf("I/O Handler %d: connection closed on fd %d\n", h.id, connFd)
 				} else {
 					log.Printf("Read error on fd %d: %v\n", connFd, err)
 				}
