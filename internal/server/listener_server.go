@@ -8,6 +8,7 @@ import (
 	"syscall"
 
 	"github.com/nhtuan0700/godis/internal/config"
+	"golang.org/x/sys/unix"
 )
 
 func (s *Server) StartSingleListener(wg *sync.WaitGroup) error {
@@ -52,7 +53,7 @@ func createReusablePortListener(network, addr string) (net.Listener, error) {
 		Control: func(network, address string, c syscall.RawConn) error {
 			var err error
 			err = c.Control(func(fd uintptr) {
-				err = syscall.SetsockoptInt(int(fd), syscall.SOL_SOCKET, syscall.SO_REUSEPORT, 1)
+				err = syscall.SetsockoptInt(int(fd), unix.SOL_SOCKET, unix.SO_REUSEPORT, 1)
 			})
 			return err
 		},

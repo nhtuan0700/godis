@@ -1,10 +1,11 @@
 module github.com/nhtuan0700/godis
 
-go 1.24.1
+go 1.25.0
 
 require (
 	github.com/spaolacci/murmur3 v1.1.0
 	github.com/stretchr/testify v1.10.0
+	golang.org/x/sys v0.43.0
 )
 
 require (
