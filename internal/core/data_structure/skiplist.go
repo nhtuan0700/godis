@@ -270,10 +270,10 @@ func (sl *Skiplist) Delete(score float64, elm string) bool {
 func (sl *Skiplist) Get(score float64, elm string) *SkiplistNode {
 	x := sl.head
 
-	for i := sl.level - 1; i > 0; i-- {
+	for i := sl.level - 1; i >= 0; i-- {
 		for x.levels[i].forward != nil && (x.levels[i].forward.score < score ||
 			(x.levels[i].forward.score == score && strings.Compare(x.levels[i].forward.elm, elm) <= 0)) {
-				x = x.levels[i].forward
+			x = x.levels[i].forward
 		}
 
 		if x != nil && x.score == score && x.elm == elm {

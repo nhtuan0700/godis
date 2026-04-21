@@ -27,7 +27,7 @@ func TestInitSkipList(t *testing.T) {
 	testCases := []struct {
 		key          string
 		score        float64
-		expectedRank uint32
+		expectedRank uint64
 	}{
 		{
 			key:          "k1",
