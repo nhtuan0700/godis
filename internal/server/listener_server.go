@@ -2,21 +2,23 @@ package server
 
 import (
 	"context"
+	"errors"
 	"log"
 	"net"
-	"sync"
 	"syscall"
 
 	"github.com/nhtuan0700/godis/internal/config"
 	"golang.org/x/sys/unix"
 )
 
-func (s *Server) StartSingleListener(wg *sync.WaitGroup) error {
-	defer wg.Done()
-
+func (s *Server) StartSingleListener() error {
 	// Start all I/O handlers event loops
 	for _, handler := range s.ioHandlers {
-		go handler.Run()
+		s.wg.Add(1)
+		go func(handler *IOHandler) {
+			defer s.wg.Done()
+			handler.Run()
+		}(handler)
 	}
 
 	// Setup listener socket
@@ -25,19 +27,26 @@ func (s *Server) StartSingleListener(wg *sync.WaitGroup) error {
 	if err != nil {
 		return err
 	}
+	s.addListener(listener)
 	defer listener.Close()
 
 	log.Printf("Server listening on %s", config.Address)
 
 	for {
+		if s.isDraining() {
+			return nil
+		}
+
 		conn, err := listener.Accept()
 		if err != nil {
+			if s.isDraining() || errors.Is(err, net.ErrClosed) {
+				return nil
+			}
 			log.Printf("Failed to accept connection: %v", err)
 			continue
 		}
 
-		handler := s.ioHandlers[s.nextIOHandler]
-		s.nextIOHandler = (s.nextIOHandler + 1) % len(s.ioHandlers)
+		handler := s.nextHandler()
 
 		if err := handler.AddConn(conn); err != nil {
 			log.Printf("Failed to add connection to I/O handler %d: %v", handler.id, err)
@@ -62,33 +71,45 @@ func createReusablePortListener(network, addr string) (net.Listener, error) {
 	return lc.Listen(context.Background(), network, addr)
 }
 
-func (s *Server) StartMultiListeners(wg *sync.WaitGroup) error {
-	defer wg.Done()
-
+func (s *Server) StartMultiListeners() error {
 	// Start all I/O handlers event loops
 	for _, handler := range s.ioHandlers {
-		go handler.Run()
+		s.wg.Add(1)
+		go func(handler *IOHandler) {
+			defer s.wg.Done()
+			handler.Run()
+		}(handler)
 	}
 
 	// Start a listener for each I/O handler
 	for i := 0; i < config.ListenerNumber; i++ {
-		go func() {
+		s.wg.Add(1)
+		go func(listenerID int) {
+			defer s.wg.Done()
+
 			listener, err := createReusablePortListener(config.Protocol, config.Address)
 			if err != nil {
 				log.Fatal(err)
 			}
+			s.addListener(listener)
 			defer listener.Close()
-			log.Printf("Listener %d started on %s", i, config.Address)
+			log.Printf("Listener %d started on %s", listenerID, config.Address)
 
 			for {
+				if s.isDraining() {
+					return
+				}
+
 				conn, err := listener.Accept()
 				if err != nil {
+					if s.isDraining() || errors.Is(err, net.ErrClosed) {
+						return
+					}
 					log.Printf("Failed to accept connection: %v", err)
 					continue
 				}
 
-				handler := s.ioHandlers[s.nextIOHandler]
-				s.nextIOHandler = (s.nextIOHandler + 1) % len(s.ioHandlers)
+				handler := s.nextHandler()
 
 				if err := handler.AddConn(conn); err != nil {
 					log.Printf("Failed to add connection to I/O handler %d: %v", handler.id, err)
@@ -96,7 +117,7 @@ func (s *Server) StartMultiListeners(wg *sync.WaitGroup) error {
 					conn.Close()
 				}
 			}
-		}()
+		}(i)
 	}
 
 	return nil

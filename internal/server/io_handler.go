@@ -41,6 +41,10 @@ func NewIOHandler(id int, server *Server) (*IOHandler, error) {
 }
 
 func (h *IOHandler) AddConn(conn net.Conn) error {
+	if h.server.isDraining() {
+		return net.ErrClosed
+	}
+
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
@@ -73,14 +77,25 @@ func (h *IOHandler) Run() {
 	log.Printf("I/O Handler %d started\n", h.id)
 
 	for {
+		if h.server.isDraining() {
+			return
+		}
+
 		// wait for data from any fd in the monitoring list
 		events, err := h.ioMultiplexer.Wait()
 		if err != nil {
+			if h.server.isDraining() {
+				return
+			}
 			log.Printf("I/O Handler %d error while waiting for events: %v\n", h.id, err)
 			continue
 		}
 
 		for _, event := range events {
+			if h.server.isDraining() {
+				return
+			}
+
 			connFd := event.Fd
 			// log.Printf("I/O Handler %d received event on fd %d\n", h.id, connFd)
 
@@ -91,9 +106,7 @@ func (h *IOHandler) Run() {
 				} else {
 					log.Printf("Read error on fd %d: %v\n", connFd, err)
 				}
-				if err := syscall.Close(connFd); err != nil {
-					log.Printf("Error closing fd %d: %v\n", connFd, err)
-				}
+				h.closeConn(connFd)
 				continue
 			}
 
@@ -106,10 +119,44 @@ func (h *IOHandler) Run() {
 			// dispatch the command to the corresponding worker
 			h.server.dispatch(task)
 
-			res := <-replyChan
+			res, ok := <-replyChan
+			if !ok {
+				return
+			}
 			if err := respond(res, connFd); err != nil {
 				log.Printf("Write error on fd %d: %v\n", connFd, err)
 			}
 		}
+	}
+}
+
+func (h *IOHandler) closeConn(fd int) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	h.closeConnLocked(fd)
+}
+
+func (h *IOHandler) closeConnLocked(fd int) {
+	if conn, ok := h.conns[fd]; ok {
+		if err := conn.Close(); err != nil {
+			log.Printf("I/O Handler %d failed to close fd %d: %v", h.id, fd, err)
+		}
+		delete(h.conns, fd)
+	}
+}
+
+func (h *IOHandler) CloseMultiplexer() {
+	if err := h.ioMultiplexer.Close(); err != nil {
+		log.Printf("I/O Handler %d failed to close multiplexer: %v", h.id, err)
+	}
+}
+
+func (h *IOHandler) CloseConnections() {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	for fd := range h.conns {
+		h.closeConnLocked(fd)
 	}
 }
