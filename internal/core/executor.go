@@ -1,247 +1,71 @@
 package core
 
 import (
-	"bytes"
-	"errors"
 	"fmt"
-	"strconv"
-	"syscall"
-	"time"
 
 	"github.com/nhtuan0700/godis/internal/constant"
-	"github.com/nhtuan0700/godis/internal/core/data_structure"
 )
 
-// PING [message]
-func cmdPING(args []string) []byte {
-	switch {
-	case len(args) == 0:
-		return Encode("PONG", true)
-	case len(args) == 1:
-		return Encode(args[0], false)
-	default:
-		return Encode(errors.New("ERR wrong number of arguments for 'ping' command"), false)
-	}
-}
-
-// SET key value [EX seconds]
-func cmdSet(args []string) []byte {
-	if len(args) == 1 || len(args) == 3 || len(args) > 4 {
-		return Encode(errors.New("ERR wrong number of arguments for 'set' command"), false)
-	}
-
-	var ttlMs uint64 = 0
-	key, value := args[0], args[1]
-	if len(args) > 2 {
-		ttlSec, err := strconv.ParseInt(args[3], 10, 64)
-		if err != nil {
-			return Encode(errors.New("ERR value is not an integer or out of range"), false)
-		}
-		ttlMs = uint64(ttlSec) * 1000
-	}
-
-	dictStore.Set(key, dictStore.NewObj(key, value, ttlMs))
-	return constant.RespOk
-}
-
-// GET key
-func cmdGet(args []string) []byte {
-	if len(args) != 1 {
-		return Encode(errors.New("ERR wrong number of arguments for 'get' command"), false)
-	}
-
-	key := args[0]
-	obj := dictStore.Get(key)
-	if obj == nil {
-		return constant.RespNil
-	}
-
-	if dictStore.HasExpired(key) {
-		return constant.RespNil
-	}
-
-	return Encode(obj.Value, false)
-}
-
-// TTL key
-func cmdTTL(args []string) []byte {
-	if len(args) > 1 {
-		return Encode(errors.New("ERR wrong number of arguments for 'ttl' command"), false)
-	}
-
-	key := args[0]
-	obj := dictStore.Get(key)
-	if obj == nil {
-		return constant.RespKeyNotExist
-	}
-
-	exp, ok := dictStore.GetExpiry(key)
-	if !ok {
-		return constant.TTLKeyExistNoExpire
-	}
-	remains := int64(exp - uint64(time.Now().UnixMilli()))
-	if remains < 0 {
-		return constant.RespKeyNotExist
-	}
-
-	return Encode(remains/1000, false)
-}
-
-// PTTL key
-func cmdPTTL(args []string) []byte {
-	if len(args) > 1 {
-		return Encode(errors.New("ERR wrong number of arguments for 'pttl' command"), false)
-	}
-
-	key := args[0]
-	obj := dictStore.Get(key)
-	if obj == nil {
-		return constant.RespKeyNotExist
-	}
-
-	exp, ok := dictStore.GetExpiry(key)
-	if !ok {
-		return constant.TTLKeyExistNoExpire
-	}
-	remains := int64(exp - uint64(time.Now().UnixMilli()))
-	if remains < 0 {
-		return constant.RespKeyNotExist
-	}
-
-	return Encode(remains, false)
-}
-
-// DEL key [key ...]
-func cmdDel(args []string) []byte {
-	if len(args) == 0 {
-		return Encode(errors.New("ERR wrong number of arguments for 'del' command"), false)
-	}
-
-	delCount := 0
-	for _, key := range args {
-		obj := dictStore.Get(key)
-		if obj == nil {
-			continue
-		}
-		delCount++
-	}
-
-	return Encode(delCount, false)
-}
-
-// EXISTS key [key ...]
-func cmdExists(args []string) []byte {
-	if len(args) == 0 {
-		return Encode(errors.New("ERR wrong number of arguments for 'exists' command"), false)
-	}
-
-	existingCount := 0
-	for _, key := range args {
-		obj := dictStore.Get(key)
-		if obj == nil {
-			continue
-		}
-		existingCount++
-	}
-
-	return Encode(existingCount, false)
-}
-
-// EXPIRE key seconds
-func cmdExpire(args []string) []byte {
-	if len(args) != 2 {
-		return Encode(errors.New("ERR wrong number of arguments for 'expire' command"), false)
-	}
-
-	key, value := args[0], args[1]
-	obj := dictStore.Get(key)
-	if obj == nil {
-		return Encode(0, false)
-	}
-
-	expiredSec, err := strconv.ParseInt(value, 10, 64)
-	if err != nil {
-		return Encode(errors.New("ERR value is not an integer or out of range"), false)
-	}
-	if expiredSec <= 0 {
-		dictStore.Del(key)
-	} else {
-		dictStore.SetExpiry(key, uint64(expiredSec*1000))
-	}
-
-	return Encode(1, false)
-}
-
-// INFO [section [section...]]
-func cmdINFO(args []string) []byte {
-	var info []byte
-	buf := bytes.NewBuffer(info)
-	buf.WriteString("# Keyspace\r\n")
-	buf.WriteString(fmt.Sprintf("db:key=%d,epxires=%d,avg_ttl=0\r\n", data_structure.HashKeySpaceStat.Key, data_structure.HashKeySpaceStat.Expire))
-	return Encode(buf.String(), false)
-}
-
-// ExecuteAndResponse given a command, executes it and response
-func ExecuteAndResponse(cmd *Command, connFd int) error {
+// ExecuteCommand given a command, executes it and response
+func ExecuteCommand(redisDB *RedisDB, cmd *Command) []byte {
 	var res []byte
 
 	switch cmd.Cmd {
 	case constant.CMD_PING:
 		res = cmdPING(cmd.Args)
 	case constant.CMD_SET:
-		res = cmdSet(cmd.Args)
+		res = cmdSet(redisDB, cmd.Args)
 	case constant.CMD_GET:
-		res = cmdGet(cmd.Args)
+		res = cmdGet(redisDB, cmd.Args)
 	case constant.CMD_TTL:
-		res = cmdTTL(cmd.Args)
+		res = cmdTTL(redisDB, cmd.Args)
 	case constant.CMD_PTTL:
-		res = cmdPTTL(cmd.Args)
+		res = cmdPTTL(redisDB, cmd.Args)
 	case constant.CMD_DEL:
-		res = cmdDel(cmd.Args)
+		res = cmdDel(redisDB, cmd.Args)
 	case constant.CMD_EXIST:
-		res = cmdExists(cmd.Args)
+		res = cmdExists(redisDB, cmd.Args)
 	case constant.CMD_EXPIRE:
-		res = cmdExpire(cmd.Args)
+		res = cmdExpire(redisDB, cmd.Args)
 	case constant.CMD_SADD:
-		res = cmdSADD(cmd.Args)
+		res = cmdSADD(redisDB, cmd.Args)
 	case constant.CMD_SREM:
-		res = cmdSREM(cmd.Args)
+		res = cmdSREM(redisDB, cmd.Args)
 	case constant.CMD_SISMEMBER:
-		res = cmdSISMEMBER(cmd.Args)
+		res = cmdSISMEMBER(redisDB, cmd.Args)
 	case constant.CMD_SMEMBERS:
-		res = cmdSMEMEBERS(cmd.Args)
+		res = cmdSMEMEBERS(redisDB, cmd.Args)
 	case constant.CMD_ZADD:
-		res = cmdZADD(cmd.Args)
+		res = cmdZADD(redisDB, cmd.Args)
 	case constant.CMD_ZSCORE:
-		res = cmdZSCORE(cmd.Args)
+		res = cmdZSCORE(redisDB, cmd.Args)
 	case constant.CMD_ZRANK:
-		res = cmdZRANK(cmd.Args)
+		res = cmdZRANK(redisDB, cmd.Args)
 	case constant.CMD_ZREM:
-		res = cmdZREM(cmd.Args)
+		res = cmdZREM(redisDB, cmd.Args)
 	case constant.CMD_CMS_INITBYDIM:
-		res = cmdCMSINITBYDIM(cmd.Args)
+		res = cmdCMSINITBYDIM(redisDB, cmd.Args)
 	case constant.CMD_CMS_INITBYPROB:
-		res = cmdCMSINITBYPROB(cmd.Args)
+		res = cmdCMSINITBYPROB(redisDB, cmd.Args)
 	case constant.CMD_CMS_INCRBY:
-		res = cmdCMSINCRBY(cmd.Args)
+		res = cmdCMSINCRBY(redisDB, cmd.Args)
 	case constant.CMD_CMS_QUERY:
-		res = cmdCMSQUERY(cmd.Args)
+		res = cmdCMSQUERY(redisDB, cmd.Args)
 	case constant.CMD_BF_RESERVE:
-		res = cmdBFRESERVE(cmd.Args)
+		res = cmdBFRESERVE(redisDB, cmd.Args)
 	case constant.CMD_BF_ADD:
-		res = cmdBFADD(cmd.Args)
+		res = cmdBFADD(redisDB, cmd.Args)
 	case constant.CMD_BF_MADD:
-		res = cmdBFMADD(cmd.Args)
+		res = cmdBFMADD(redisDB, cmd.Args)
 	case constant.CMD_BF_EXISTS:
-		res = cmdBFEXISTS(cmd.Args)
+		res = cmdBFEXISTS(redisDB, cmd.Args)
 	case constant.CMD_BF_MEXISTS:
-		res = cmdBFMEXISTS(cmd.Args)
+		res = cmdBFMEXISTS(redisDB, cmd.Args)
 	case constant.CMD_INFO:
-		res = cmdINFO(cmd.Args)
+		res = cmdINFO(redisDB, cmd.Args)
 	default:
 		res = []byte(fmt.Sprintf("-ERR unknown command %s, with args beginning with:\r\n", cmd.Cmd))
 	}
 
-	_, err := syscall.Write(connFd, res)
-	return err
+	return res
 }

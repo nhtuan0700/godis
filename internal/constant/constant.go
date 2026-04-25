@@ -1,5 +1,7 @@
 package constant
 
+import "time"
+
 const CRLF = "\r\n"
 
 var (
@@ -30,3 +32,5 @@ const (
 	ServerStatusBusy
 	ServerStatusShuttingDown
 )
+
+const ActiveExpireFrequency = 500 * time.Millisecond

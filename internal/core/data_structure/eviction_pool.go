@@ -11,8 +11,26 @@ type EvictionCandidate struct {
 	lastAccessTime uint32
 }
 
+func (ec *EvictionCandidate) Key() string {
+	return ec.key
+}
+
+func (ec *EvictionCandidate) LastAccessTime() uint32 {
+	return ec.lastAccessTime
+}
+
 type EvictionPool struct {
 	pool []*EvictionCandidate
+}
+
+func NewEpool(n int) *EvictionPool {
+	return &EvictionPool{
+		pool: make([]*EvictionCandidate, n),
+	}
+}
+
+func (e *EvictionPool) Pool() []*EvictionCandidate {
+	return e.pool
 }
 
 // ByLastAccessTime used for sort the pool.

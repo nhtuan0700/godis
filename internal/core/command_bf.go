@@ -9,14 +9,18 @@ import (
 )
 
 // BF.RESERVE key error_rate entries
-func cmdBFRESERVE(args []string) []byte {
+func cmdBFRESERVE(redisDB *RedisDB, args []string) []byte {
 	if len(args) != 3 {
 		return Encode(errors.New("ERR wrong number of arguments for 'bf.reserve' command"), false)
 	}
 
 	key := args[0]
-	_, exist := bloomStore[key]
+	obj, exist := redisDB.dict[key]
 	if exist {
+		_, ok := obj.value.(*data_structure.BloomFilter)
+		if !ok {
+			return constant.ErrorWrongTypeKey
+		}
 		return Encode(errors.New("ERR item exists"), false)
 	}
 
@@ -37,41 +41,57 @@ func cmdBFRESERVE(args []string) []byte {
 	if capacity < 1 || capacity > 1<<30 {
 		return Encode(errors.New("ERR capacity must be in the range [1, 1073741824]"), false)
 	}
-	bloomStore[key] = data_structure.CreateBloomFilter(capacity, errorRate)
+	redisDB.dict[key] = NewRedisObj(data_structure.CreateBloomFilter(capacity, errorRate))
 
 	return constant.RespOk
 }
 
 // BF.ADD key entry
-func cmdBFADD(args []string) []byte {
+func cmdBFADD(redisDB *RedisDB, args []string) []byte {
 	if len(args) != 2 {
 		return Encode(errors.New("ERR wrong number of arguments for 'bf.add' command"), false)
 	}
 
 	key, entry := args[0], args[1]
-	bloom, exist := bloomStore[key]
+	var bloom *data_structure.BloomFilter
+
+	obj, exist := redisDB.dict[key]
 	if !exist {
-		bloomStore[key] = data_structure.CreateBloomFilter(constant.BfDefaultInitCapacity, constant.BfDefaultErrRate)
-		bloom = bloomStore[key]
+		bloom = data_structure.CreateBloomFilter(constant.BfDefaultInitCapacity, constant.BfDefaultErrRate)
+		redisDB.dict[key] = NewRedisObj(bloom)
+	} else {
+		var ok bool
+		bloom, ok = obj.value.(*data_structure.BloomFilter)
+		if !ok {
+			return constant.ErrorWrongTypeKey
+		}
 	}
 
 	if bloom.Add(entry) {
 		return constant.RespOne
 	}
+
 	return constant.RespZero
 }
 
 // BF.MADD key entry [entry ...]
-func cmdBFMADD(args []string) []byte {
+func cmdBFMADD(redisDB *RedisDB, args []string) []byte {
 	if len(args) < 2 {
 		return Encode(errors.New("ERR wrong number of arguments for 'bf.madd' command"), false)
 	}
 
 	key := args[0]
-	bloom, exist := bloomStore[key]
+	var bloom *data_structure.BloomFilter
+	obj, exist := redisDB.dict[key]
 	if !exist {
-		bloomStore[key] = data_structure.CreateBloomFilter(constant.BfDefaultInitCapacity, constant.BfDefaultErrRate)
-		bloom = bloomStore[key]
+		bloom = data_structure.CreateBloomFilter(constant.BfDefaultInitCapacity, constant.BfDefaultErrRate)
+		redisDB.dict[key] = NewRedisObj(bloom)
+	} else {
+		var ok bool
+		bloom, ok = obj.value.(*data_structure.BloomFilter)
+		if !ok {
+			return constant.ErrorWrongTypeKey
+		}
 	}
 
 	res := make([]any, 0)
@@ -87,14 +107,19 @@ func cmdBFMADD(args []string) []byte {
 }
 
 // BF.EXISTS key entry
-func cmdBFEXISTS(args []string) []byte {
+func cmdBFEXISTS(redisDB *RedisDB, args []string) []byte {
 	if len(args) != 2 {
 		return Encode(errors.New("ERR wrong number of arguments for 'bf.exists' command"), false)
 	}
 	key, entry := args[0], args[1]
-	bloom, exist := bloomStore[key]
+	var bloom *data_structure.BloomFilter
+	obj, exist := redisDB.dict[key]
 	if !exist {
 		return Encode(constant.RespZero, false)
+	}
+	bloom, ok := obj.value.(*data_structure.BloomFilter)
+	if !ok {
+		return constant.ErrorWrongTypeKey
 	}
 	if bloom.Exist(entry) {
 		return constant.RespOne
@@ -104,19 +129,25 @@ func cmdBFEXISTS(args []string) []byte {
 }
 
 // BF.MEXISTS key entry [entry ...]
-func cmdBFMEXISTS(args []string) []byte {
+func cmdBFMEXISTS(redisDB *RedisDB, args []string) []byte {
 	if len(args) < 2 {
 		return Encode(errors.New("ERR wrong number of arguments for 'bf.exists' command"), false)
 	}
 
 	res := make([]any, 0)
 	key := args[0]
-	bloom, exist := bloomStore[key]
+	var bloom *data_structure.BloomFilter
+	obj, exist := redisDB.dict[key]
 	if !exist {
 		for i := 1; i < len(args); i++ {
 			res = append(res, 0)
 		}
 		return Encode(res, false)
+	}
+
+	bloom, ok := obj.value.(*data_structure.BloomFilter)
+	if !ok {
+		return constant.ErrorWrongTypeKey
 	}
 
 	for i := 1; i < len(args); i++ {

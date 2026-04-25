@@ -16,6 +16,8 @@ import (
 	"github.com/nhtuan0700/godis/internal/core/io_multiplexer"
 )
 
+var redisDB = core.NewRedisDB()
+
 func readCommand(fd int) (*core.Command, error) {
 	var buf = make([]byte, 512)
 	n, err := syscall.Read(fd, buf)
@@ -81,14 +83,14 @@ func RunIOMultiplexingServer(wg *sync.WaitGroup) error {
 	// events := make([]io_multiplexer.Event, config.MaxConnections)
 	for atomic.LoadInt32(&serverStatus) != constant.ServerStatusShuttingDown {
 		// Check last execution time and call it if it is more than 100ms ago
-		if time.Now().After(lastActiveExpireExecTime) {
+		if time.Now().After(lastActiveExpireExecTime.Add(constant.ActiveExpireFrequency)) {
 			// Idle
 			if !atomic.CompareAndSwapInt32(&serverStatus, constant.ServerStatusIdle, constant.ServerStatusBusy) {
 				if serverStatus == constant.ServerStatusShuttingDown {
 					return nil
 				}
 			}
-			core.ActiveDeleteExpiredKeys() // Busy
+			core.ActiveDeleteExpiredKeys(redisDB) // Busy
 			atomic.SwapInt32(&serverStatus, constant.ServerStatusIdle)
 			lastActiveExpireExecTime = time.Now()
 		}
@@ -136,7 +138,8 @@ func RunIOMultiplexingServer(wg *sync.WaitGroup) error {
 					continue
 				}
 
-				if err := core.ExecuteAndResponse(cmd, events[i].Fd); err != nil {
+				res := core.ExecuteCommand(redisDB, cmd)
+				if err := respond(res, events[i].Fd); err != nil {
 					log.Println("write err: ", err)
 				}
 			}

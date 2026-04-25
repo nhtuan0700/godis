@@ -64,5 +64,6 @@ func (zs *ZSet) Remove(elm string) bool {
 		return false
 	}
 
+	delete(zs.dict, elm)
 	return zs.zskiplist.Delete(score, elm)
 }

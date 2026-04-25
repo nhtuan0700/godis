@@ -6,12 +6,12 @@ import (
 	"github.com/nhtuan0700/godis/internal/constant"
 )
 
-func ActiveDeleteExpiredKeys() {
+func ActiveDeleteExpiredKeys(redisDB *RedisDB) {
 	for {
 		var expiredCount = 0
 		var sampleCountRemain = constant.ActiveExpireSampleSized
 
-		for key, expiredTime := range dictStore.GetExpiredDictStore() {
+		for key, expiredTime := range redisDB.GetExpireDict() {
 			sampleCountRemain--
 			// get first ActiveExpireSampleSized elements
 			if sampleCountRemain < 0 {
@@ -20,7 +20,7 @@ func ActiveDeleteExpiredKeys() {
 
 			// if expired then delete and increase expiredcount
 			if time.Now().UnixMilli() > int64(expiredTime) {
-				dictStore.Del(key)
+				redisDB.Delete(key)
 				expiredCount++
 			}
 		}

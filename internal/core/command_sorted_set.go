@@ -10,7 +10,7 @@ import (
 )
 
 // ZADD key score member [score member ...]
-func cmdZADD(args []string) []byte {
+func cmdZADD(redisDB *RedisDB, args []string) []byte {
 	if len(args) < 3 {
 		return Encode(errors.New("ERR wrong number of arguments for 'zadd' command"), false)
 	}
@@ -23,10 +23,17 @@ func cmdZADD(args []string) []byte {
 	}
 
 	key := args[0]
-	zset, exist := zsetStore[key]
+	var zset *data_structure.ZSet
+	obj, exist := redisDB.dict[key]
 	if !exist {
 		zset = data_structure.NewZSet()
-		zsetStore[key] = zset
+		redisDB.dict[key] = NewRedisObj(zset)
+	} else {
+		var ok bool
+		zset, ok = obj.value.(*data_structure.ZSet)
+		if !ok {
+			return constant.ErrorWrongTypeKey
+		}
 	}
 
 	added := 0
@@ -46,15 +53,20 @@ func cmdZADD(args []string) []byte {
 }
 
 // ZSCORE key member
-func cmdZSCORE(args []string) []byte {
+func cmdZSCORE(redisDB *RedisDB, args []string) []byte {
 	if len(args) != 2 {
 		return Encode(errors.New("ERR wrong number of arguments for 'zscore' command"), false)
 	}
 
 	key, member := args[0], args[1]
-	zset, exist := zsetStore[key]
+	obj, exist := redisDB.dict[key]
 	if !exist {
 		return constant.RespNil
+	}
+
+	zset, ok := obj.value.(*data_structure.ZSet)
+	if !ok {
+		return constant.ErrorWrongTypeKey
 	}
 
 	score, exist := zset.GetScore(member)
@@ -66,15 +78,20 @@ func cmdZSCORE(args []string) []byte {
 }
 
 // ZRANK key member
-func cmdZRANK(args []string) []byte {
+func cmdZRANK(redisDB *RedisDB, args []string) []byte {
 	if len(args) != 2 {
 		return Encode(errors.New("ERR wrong number of arguments for 'zrank' command"), false)
 	}
 
 	key, member := args[0], args[1]
-	zset, exist := zsetStore[key]
+	obj, exist := redisDB.dict[key]
 	if !exist {
 		return constant.RespNil
+	}
+
+	zset, ok := obj.value.(*data_structure.ZSet)
+	if !ok {
+		return constant.ErrorWrongTypeKey
 	}
 
 	rank, exist := zset.GetRank(member, false)
@@ -86,15 +103,20 @@ func cmdZRANK(args []string) []byte {
 }
 
 // ZREM key member [member ...]
-func cmdZREM(args []string) []byte {
+func cmdZREM(redisDB *RedisDB, args []string) []byte {
 	if len(args) < 2 {
 		return Encode(errors.New("ERR wrong number of arguments for 'zrem' command"), false)
 	}
 
 	key := args[0]
-	zset, exist := zsetStore[key]
+	obj, exist := redisDB.dict[key]
 	if !exist {
 		return constant.RespNil
+	}
+
+	zset, ok := obj.value.(*data_structure.ZSet)
+	if !ok {
+		return constant.ErrorWrongTypeKey
 	}
 
 	removeCount := 0

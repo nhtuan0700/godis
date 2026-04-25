@@ -91,9 +91,9 @@ func (h *IOHandler) Run() {
 				} else {
 					log.Printf("Read error on fd %d: %v\n", connFd, err)
 				}
-				// if err := syscall.Close(connFd); err != nil {
-				// 	log.Printf("Error closing fd %d: %v\n", connFd, err)
-				// }
+				if err := syscall.Close(connFd); err != nil {
+					log.Printf("Error closing fd %d: %v\n", connFd, err)
+				}
 				continue
 			}
 
